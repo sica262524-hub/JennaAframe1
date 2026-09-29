@@ -1,120 +1,219 @@
 <!DOCTYPE html>
 <html>
-
 <head>
 
 <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
 
+<style>
+#endingOverlay{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  pointer-events:none;
+  opacity:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#000;
+  transition:opacity .5s ease,background .8s ease;
+}
 
-<!-- 最后白点 -->
+#endingOverlay.active{
+  opacity:1;
+  background:radial-gradient(
+    circle at center,
+    #fff 0%,
+    #fff 24%,
+    #eeeeee 34%,
+    #999 48%,
+    #333 66%,
+    #000 88%
+  );
+}
+
+#endingOverlay.fullBlack{
+  background:#000;
+}
+
+.endingSilhouette{
+  position:absolute;
+  width:min(58vw,620px);
+  height:min(58vh,620px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:0;
+  filter:blur(2.5px);
+  transition:opacity .06s linear;
+}
+
+.endingSilhouette svg{
+  width:100%;
+  height:100%;
+}
+
+#mammothSilhouette{transform:scale(1.1);}
+#humanSilhouette{transform:scale(.82);}
+
+#endingText{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:90%;
+  text-align:center;
+  color:#ff1a1a;
+  font-family:Arial Black,Arial,sans-serif;
+  font-size:clamp(20px,2.5vw,38px);
+  font-weight:900;
+  letter-spacing:4px;
+  opacity:0;
+  text-shadow:
+    0 0 6px rgba(255,0,0,.9),
+    0 0 14px rgba(180,0,0,.7);
+  transition:opacity 2s ease;
+}
+
+#endingText.show{opacity:1;}
+
+#endingText::before,
+#endingText::after{
+  content:"";
+  position:absolute;
+  top:100%;
+  width:5px;
+  height:0;
+  background:#d40000;
+  border-radius:0 0 5px 5px;
+  opacity:0;
+}
+
+#endingText::before{left:28%;}
+#endingText::after{left:68%;}
+
+#endingText.show::before{
+  opacity:.9;
+  animation:drip1 2.2s ease-in forwards;
+}
+
+#endingText.show::after{
+  opacity:.8;
+  animation:drip2 2.8s ease-in forwards;
+}
+
+@keyframes drip1{
+  0%{height:0}
+  45%{height:10px}
+  75%{height:24px}
+  100%{height:34px}
+}
+
+@keyframes drip2{
+  0%{height:0}
+  40%{height:7px}
+  70%{height:18px}
+  100%{height:28px}
+}
+</style>
+
+
 <script>
-AFRAME.registerComponent('end-trigger', {
+AFRAME.registerComponent('end-trigger',{
+  init(){this.triggered=false;},
 
-  init: function () {
-    this.triggered = false;
-  },
+  tick(){
+    if(this.triggered)return;
 
-  tick: function () {
+    const player=document.querySelector('#player');
+    const message=document.querySelector('#openMessage');
+    if(!player||!message)return;
 
-    if (this.triggered) return;
-
-    const player = document.querySelector('#player');
-    const message = document.querySelector('#openMessage');
-
-    if (!player || !message) return;
-
-    const p = new THREE.Vector3();
+    const p=new THREE.Vector3();
     player.object3D.getWorldPosition(p);
 
-    const target = new THREE.Vector3(0, -0.3, 10.8);
+    if(p.distanceTo(new THREE.Vector3(0,-0.3,10.8))<0.8){
+      this.triggered=true;
 
-    if (p.distanceTo(target) < 0.8) {
+      player.setAttribute('wasd-controls','enabled',false);
 
-      this.triggered = true;
+      message.setAttribute('visible',true);
+      message.setAttribute('text','opacity',0);
 
-      player.setAttribute('wasd-controls', 'enabled', false);
-
-      message.setAttribute('visible', true);
-      message.setAttribute('text', 'opacity', 0);
-
-      message.setAttribute('animation', {
-        property: 'text.opacity',
-        from: 0,
-        to: 1,
-        dur: 2000
+      message.setAttribute('animation',{
+        property:'text.opacity',
+        from:0,
+        to:1,
+        dur:2000
       });
 
-      setTimeout(() => {
+      setTimeout(()=>{
+        player.setAttribute('wasd-controls','enabled',true);
 
-        player.setAttribute('wasd-controls', 'enabled', true);
-
-        setTimeout(() => {
-
-          message.setAttribute('animation__fadeout', {
-            property: 'text.opacity',
-            from: 1,
-            to: 0,
-            dur: 1000
+        setTimeout(()=>{
+          message.setAttribute('animation__fadeout',{
+            property:'text.opacity',
+            from:1,
+            to:0,
+            dur:1000
           });
 
-          setTimeout(() => {
+          setTimeout(()=>{
+            message.setAttribute('visible',false);
 
-            message.setAttribute('visible', false);
+            const door=document.querySelector('#doorPivot');
 
-            const door = document.querySelector('#doorPivot');
-
-            if (door) {
-              door.setAttribute('door-open', 'enabled', true);
+            if(door){
+              door.setAttribute(
+                'door-open',
+                'enabled',
+                true
+              );
             }
 
-          }, 1000);
+          },1000);
 
-        }, 1000);
+        },1000);
 
-      }, 2000);
+      },2000);
     }
   }
 });
 </script>
 
 
-<!-- 门 -->
 <script>
-AFRAME.registerComponent('door-open', {
-
-  schema: {
-    enabled: {default: false}
+AFRAME.registerComponent('door-open',{
+  schema:{
+    enabled:{default:false}
   },
 
-  init: function () {
-    this.opened = false;
+  init(){
+    this.opened=false;
   },
 
-  tick: function () {
+  tick(){
+    if(!this.data.enabled||this.opened)return;
 
-    if (!this.data.enabled || this.opened) return;
+    const player=document.querySelector('#player');
+    if(!player)return;
 
-    const player = document.querySelector('#player');
-    if (!player) return;
-
-    const p = new THREE.Vector3();
+    const p=new THREE.Vector3();
     player.object3D.getWorldPosition(p);
 
-    const door = new THREE.Vector3(
+    const door=new THREE.Vector3(
       -0.4,
       -0.3,
       10.16
     );
 
-    if (p.distanceTo(door) < 1.2) {
+    if(p.distanceTo(door)<1.2){
+      this.opened=true;
 
-      this.opened = true;
-
-      this.el.setAttribute('animation', {
-        property: 'rotation',
-        to: '0 -90 0',
-        dur: 1200,
-        easing: 'easeInOutQuad'
+      this.el.setAttribute('animation',{
+        property:'rotation',
+        to:'0 -90 0',
+        dur:1200,
+        easing:'easeInOutQuad'
       });
     }
   }
@@ -122,135 +221,126 @@ AFRAME.registerComponent('door-open', {
 </script>
 
 
-<!-- Room2 声音 -->
 <script>
-AFRAME.registerComponent('mammoth-sound', {
+AFRAME.registerComponent('mammoth-sound',{
+  init(){
+    this.ctx=null;
+    this.master=null;
+    this.filter=null;
+    this.stereo=null;
+    this.started=false;
+    this.delay=2000;
+    this.endingStopped=false;
 
-  init: function () {
-
-    this.ctx = null;
-    this.master = null;
-    this.filter = null;
-    this.stereo = null;
-
-    this.started = false;
-    this.delay = 2000;
-
-    const unlock = () => {
-
+    const unlock=()=>{
       this.setup();
 
-      if (this.ctx.state === 'suspended') {
+      if(this.ctx.state==='suspended'){
         this.ctx.resume();
       }
     };
 
-    window.addEventListener('keydown', unlock, {once:true});
-    window.addEventListener('pointerdown', unlock, {once:true});
+    window.addEventListener(
+      'keydown',
+      unlock,
+      {once:true}
+    );
+
+    window.addEventListener(
+      'pointerdown',
+      unlock,
+      {once:true}
+    );
   },
 
+  setup(){
+    if(this.ctx)return;
 
-  setup: function () {
-
-    if (this.ctx) return;
-
-    const AC =
-      window.AudioContext ||
+    const AC=
+      window.AudioContext||
       window.webkitAudioContext;
 
-    this.ctx = new AC();
+    this.ctx=new AC();
+    this.master=this.ctx.createGain();
+    this.filter=this.ctx.createBiquadFilter();
+    this.stereo=this.ctx.createStereoPanner();
 
-    this.master =
-      this.ctx.createGain();
-
-    this.filter =
-      this.ctx.createBiquadFilter();
-
-    this.filter.type = 'lowpass';
-
-    this.stereo =
-      this.ctx.createStereoPanner();
+    this.filter.type='lowpass';
 
     this.filter.connect(this.stereo);
     this.stereo.connect(this.master);
     this.master.connect(this.ctx.destination);
   },
 
-
-  thump: function () {
+  thump(){
+    if(this.endingStopped)return;
 
     this.setup();
 
-    if (this.ctx.state === 'suspended') {
+    if(this.ctx.state==='suspended'){
       this.ctx.resume();
     }
 
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
+    const ctx=this.ctx;
+    const now=ctx.currentTime;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
 
-    osc.type = 'sine';
+    osc.type='sine';
 
-    osc.frequency.setValueAtTime(85, now);
+    osc.frequency.setValueAtTime(85,now);
 
     osc.frequency.exponentialRampToValueAtTime(
       42,
-      now + 0.28
+      now+.28
     );
 
-    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.setValueAtTime(.001,now);
 
     gain.gain.exponentialRampToValueAtTime(
-      0.8,
-      now + 0.01
+      .8,
+      now+.01
     );
 
     gain.gain.exponentialRampToValueAtTime(
-      0.001,
-      now + 0.35
+      .001,
+      now+.35
     );
 
     osc.connect(gain);
     gain.connect(this.filter);
 
     osc.start(now);
-    osc.stop(now + 0.4);
+    osc.stop(now+.4);
 
-
-    const buffer = ctx.createBuffer(
+    const buffer=ctx.createBuffer(
       1,
-      ctx.sampleRate * 0.08,
+      ctx.sampleRate*.08,
       ctx.sampleRate
     );
 
-    const data =
-      buffer.getChannelData(0);
+    const data=buffer.getChannelData(0);
 
-    for (let i = 0; i < data.length; i++) {
-
-      data[i] =
-        (Math.random() * 2 - 1) *
-        (1 - i / data.length);
+    for(let i=0;i<data.length;i++){
+      data[i]=
+        (Math.random()*2-1)*
+        (1-i/data.length);
     }
 
-    const noise =
-      ctx.createBufferSource();
+    const noise=ctx.createBufferSource();
+    const noiseGain=ctx.createGain();
 
-    const noiseGain =
-      ctx.createGain();
-
-    noise.buffer = buffer;
+    noise.buffer=buffer;
 
     noiseGain.gain.setValueAtTime(
-      0.20,
+      .20,
       now
     );
 
     noiseGain.gain.exponentialRampToValueAtTime(
-      0.001,
-      now + 0.08
+      .001,
+      now+.08
     );
 
     noise.connect(noiseGain);
@@ -259,112 +349,108 @@ AFRAME.registerComponent('mammoth-sound', {
     noise.start(now);
   },
 
-
-  burst: function () {
-
+  burst(){
     this.thump();
-
-    setTimeout(() => this.thump(), 320);
-    setTimeout(() => this.thump(), 650);
+    setTimeout(()=>this.thump(),320);
+    setTimeout(()=>this.thump(),650);
   },
 
+  startLoop(){
+    if(this.started)return;
 
-  startLoop: function () {
+    this.started=true;
 
-    if (this.started) return;
-
-    this.started = true;
-
-    const loop = () => {
+    const loop=()=>{
+      if(this.endingStopped)return;
 
       this.burst();
 
-      const wait = this.delay;
+      const wait=this.delay;
 
-      this.delay =
-        this.delay === 2000
-        ? 3000
-        : 2000;
+      this.delay=
+        this.delay===2000
+        ?3000
+        :2000;
 
-      this.timer =
-        setTimeout(loop, wait);
+      this.timer=setTimeout(loop,wait);
     };
 
-    this.timer =
-      setTimeout(loop, 4000);
+    this.timer=setTimeout(loop,4000);
   },
 
+  stopLoop(){
+    this.endingStopped=true;
 
-  tick: function () {
+    if(this.timer){
+      clearTimeout(this.timer);
+      this.timer=null;
+    }
 
-    if (!this.ctx) return;
+    if(this.master&&this.ctx){
+      const now=this.ctx.currentTime;
 
-    const player =
+      this.master.gain.cancelScheduledValues(now);
+
+      this.master.gain.setValueAtTime(
+        this.master.gain.value,
+        now
+      );
+
+      this.master.gain.linearRampToValueAtTime(
+        0,
+        now+.8
+      );
+    }
+  },
+
+  tick(){
+    if(!this.ctx||this.endingStopped)return;
+
+    const player=
       document.querySelector('#player');
 
-    if (!player) return;
+    if(!player)return;
 
-    const roomPos =
-      new THREE.Vector3();
+    const roomPos=new THREE.Vector3();
 
     this.el.object3D.getWorldPosition(
       roomPos
     );
 
-    const playerPos =
-      new THREE.Vector3();
+    const playerPos=new THREE.Vector3();
 
     player.object3D.getWorldPosition(
       playerPos
     );
 
-
-    const distance =
+    const distance=
       playerPos.distanceTo(roomPos);
-
 
     let volume;
 
-    if (distance > 18) {
-      volume = 0.12;
-    } else if (distance > 12) {
-      volume = 0.22;
-    } else if (distance > 8) {
-      volume = 0.38;
-    } else if (distance > 5) {
-      volume = 0.58;
-    } else if (distance > 3) {
-      volume = 0.78;
-    } else {
-      volume = 1;
-    }
+    if(distance>18)volume=.12;
+    else if(distance>12)volume=.22;
+    else if(distance>8)volume=.38;
+    else if(distance>5)volume=.58;
+    else if(distance>3)volume=.78;
+    else volume=1;
 
-    this.master.gain.value =
-      volume;
-
+    this.master.gain.value=volume;
 
     let cutoff;
 
-    if (distance > 16) {
-      cutoff = 350;
-    } else if (distance > 10) {
-      cutoff = 650;
-    } else if (distance > 6) {
-      cutoff = 1200;
-    } else if (distance > 3) {
-      cutoff = 2400;
-    } else {
-      cutoff = 5000;
-    }
+    if(distance>16)cutoff=350;
+    else if(distance>10)cutoff=650;
+    else if(distance>6)cutoff=1200;
+    else if(distance>3)cutoff=2400;
+    else cutoff=5000;
 
-    this.filter.frequency.value =
-      cutoff;
+    this.filter.frequency.value=cutoff;
 
-
-    const direction =
+    const direction=
       roomPos.clone().sub(playerPos);
 
-    const quaternion =
+    const quaternion=
       player.object3D.getWorldQuaternion(
         new THREE.Quaternion()
       );
@@ -373,117 +459,101 @@ AFRAME.registerComponent('mammoth-sound', {
       quaternion.clone().invert()
     );
 
+    const horizontal=direction.x;
+    const forward=-direction.z;
 
-    const horizontal = direction.x;
-    const forward = -direction.z;
-
-    let pan =
-      horizontal /
+    let pan=
+      horizontal/
       (
-        Math.abs(horizontal) +
-        Math.abs(forward) * 0.35 +
-        0.001
+        Math.abs(horizontal)+
+        Math.abs(forward)*.35+
+        .001
       );
 
-    pan *= 1.8;
+    pan*=1.8;
 
-    pan = Math.max(
+    pan=Math.max(
       -1,
-      Math.min(1, pan)
+      Math.min(1,pan)
     );
 
-    this.stereo.pan.value =
-      pan;
+    this.stereo.pan.value=pan;
   }
-
 });
 </script>
 
 
-<!-- 玩家小跑：只有喘息 + 上下起伏 -->
 <script>
-AFRAME.registerComponent('player-run', {
+AFRAME.registerComponent('player-run',{
+  init(){
+    this.keys={};
+    this.bobTime=0;
+    this.ctx=null;
 
-  init: function () {
-
-    this.keys = {};
-    this.bobTime = 0;
-    this.ctx = null;
-
-    this.baseY =
+    this.baseY=
       this.el.object3D.position.y;
 
-    window.addEventListener('keydown', e => {
+    window.addEventListener('keydown',e=>{
+      this.keys[e.key.toLowerCase()]=true;
 
-      this.keys[e.key.toLowerCase()] = true;
-
-      if (!this.ctx) {
-
-        const AC =
-          window.AudioContext ||
+      if(!this.ctx){
+        const AC=
+          window.AudioContext||
           window.webkitAudioContext;
 
-        this.ctx = new AC();
+        this.ctx=new AC();
       }
     });
 
-    window.addEventListener('keyup', e => {
-      this.keys[e.key.toLowerCase()] = false;
+    window.addEventListener('keyup',e=>{
+      this.keys[e.key.toLowerCase()]=false;
     });
 
-
-    setInterval(() => {
-
-      if (this.running) {
+    setInterval(()=>{
+      if(this.running){
         this.breath();
       }
-
-    }, 1400);
+    },1400);
   },
 
+  breath(){
+    if(!this.ctx)return;
 
-  breath: function () {
+    const ctx=this.ctx;
+    const now=ctx.currentTime;
 
-    if (!this.ctx) return;
-
-    const ctx = this.ctx;
-    const now = ctx.currentTime;
-
-    const buffer = ctx.createBuffer(
+    const buffer=ctx.createBuffer(
       1,
-      ctx.sampleRate * 0.45,
+      ctx.sampleRate*.45,
       ctx.sampleRate
     );
 
-    const data =
-      buffer.getChannelData(0);
+    const data=buffer.getChannelData(0);
 
-    for (let i = 0; i < data.length; i++) {
-
-      data[i] =
-        (Math.random() * 2 - 1) *
+    for(let i=0;i<data.length;i++){
+      data[i]=
+        (Math.random()*2-1)*
         Math.sin(
-          Math.PI * i / data.length
+          Math.PI*i/data.length
         );
     }
 
-    const source =
+    const source=
       ctx.createBufferSource();
 
-    const filter =
+    const filter=
       ctx.createBiquadFilter();
 
-    const gain =
+    const gain=
       ctx.createGain();
 
-    source.buffer = buffer;
+    source.buffer=buffer;
 
-    filter.type = 'bandpass';
-    filter.frequency.value = 650;
-    filter.Q.value = 0.7;
+    filter.type='bandpass';
+    filter.frequency.value=650;
+    filter.Q.value=.7;
 
-    // 很轻的喘息
-    gain.gain.value = 0.012;
+    gain.gain.value=.012;
 
     source.connect(filter);
     filter.connect(gain);
@@ -492,101 +562,85 @@ AFRAME.registerComponent('player-run', {
     source.start(now);
   },
 
-
-  tick: function (time, delta) {
-
-    const wasd =
+  tick(time,delta){
+    const wasd=
       this.el.components['wasd-controls'];
 
-    if (
-      wasd &&
-      wasd.data.enabled === false
-    ) {
-
-      this.running = false;
+    if(
+      wasd&&
+      wasd.data.enabled===false
+    ){
+      this.running=false;
       return;
     }
 
+    this.running=
+      this.keys.w||
+      this.keys.a||
+      this.keys.s||
+      this.keys.d;
 
-    this.running =
-      this.keys['w'] ||
-      this.keys['a'] ||
-      this.keys['s'] ||
-      this.keys['d'];
+    if(!this.running){
+      this.bobTime=0;
 
-
-    // 不跑时恢复正常
-    if (!this.running) {
-
-      this.bobTime = 0;
-
-      this.el.object3D.position.y =
+      this.el.object3D.position.y=
         this.baseY;
 
       return;
     }
 
+    this.bobTime+=delta*.0023;
 
-    // 跑动时明显上下起伏
-    this.bobTime += delta * 0.0023;
-
-    const bob =
+    const bob=
       Math.sin(
-        this.bobTime * 8
-      ) * 0.05;
+        this.bobTime*8
+      )*.05;
 
-    this.el.object3D.position.y =
-      this.baseY + bob;
+    this.el.object3D.position.y=
+      this.baseY+bob;
   }
-
 });
 </script>
 
 
-<!-- 开场 -->
 <script>
-AFRAME.registerComponent('intro-trigger', {
+AFRAME.registerComponent('intro-trigger',{
+  init(){
+    this.triggered=false;
+    this.waitingForT=false;
 
-  init: function () {
+    this.keyHandler=event=>{
+      if(
+        !this.waitingForT||
+        event.key.toLowerCase()!=='t'
+      )return;
 
-    this.triggered = false;
-    this.waitingForT = false;
+      this.waitingForT=false;
 
-    this.keyHandler = (event) => {
-
-      if (
-        !this.waitingForT ||
-        event.key.toLowerCase() !== 't'
-      ) return;
-
-      this.waitingForT = false;
-
-      const player =
+      const player=
         document.querySelector('#player');
 
-      const lines = [
+      const lines=[
         document.querySelector('#introLine1'),
         document.querySelector('#introLine2'),
         document.querySelector('#introLine3'),
         document.querySelector('#introLine4')
       ];
 
-      lines.forEach((line, i) => {
-
+      lines.forEach((line,i)=>{
         line.setAttribute(
-          'animation__out' + i,
+          'animation__out'+i,
           {
-            property: 'text.opacity',
-            from: 1,
-            to: 0,
-            dur: 500
+            property:'text.opacity',
+            from:1,
+            to:0,
+            dur:500
           }
         );
       });
 
-      setTimeout(() => {
-
-        lines.forEach(line =>
+      setTimeout(()=>{
+        lines.forEach(line=>
           line.setAttribute(
             'visible',
             false
@@ -599,7 +653,7 @@ AFRAME.registerComponent('intro-trigger', {
           true
         );
 
-      }, 500);
+      },500);
     };
 
     window.addEventListener(
@@ -608,62 +662,56 @@ AFRAME.registerComponent('intro-trigger', {
     );
   },
 
+  tick(){
+    if(this.triggered)return;
 
-  tick: function () {
-
-    if (this.triggered) return;
-
-    const player =
+    const player=
       document.querySelector('#player');
 
-    const line1 =
+    const line1=
       document.querySelector('#introLine1');
 
-    const line2 =
+    const line2=
       document.querySelector('#introLine2');
 
-    const line3 =
+    const line3=
       document.querySelector('#introLine3');
 
-    const line4 =
+    const line4=
       document.querySelector('#introLine4');
 
-    const ambient =
+    const ambient=
       document.querySelector('#ambientLight');
 
-    const directional =
+    const directional=
       document.querySelector('#directionalLight');
 
-    const room2 =
+    const room2=
       document.querySelector('#room2');
 
-    if (
-      !player ||
-      !line1 ||
-      !line2 ||
-      !line3 ||
-      !line4 ||
-      !ambient ||
-      !directional ||
+    if(
+      !player||
+      !line1||
+      !line2||
+      !line3||
+      !line4||
+      !ambient||
+      !directional||
       !room2
-    ) return;
+    )return;
 
-
-    const pos =
-      new THREE.Vector3();
+    const pos=new THREE.Vector3();
 
     player.object3D.getWorldPosition(pos);
 
-    const dx = pos.x - 8.4;
-    const dz = pos.z - 10;
+    const dx=pos.x-8.4;
+    const dz=pos.z-10;
 
-    const distance =
-      Math.sqrt(dx * dx + dz * dz);
+    const distance=
+      Math.sqrt(dx*dx+dz*dz);
 
-
-    if (distance < 0.8) {
-
-      this.triggered = true;
+    if(distance<.8){
+      this.triggered=true;
 
       player.setAttribute(
         'wasd-controls',
@@ -671,45 +719,42 @@ AFRAME.registerComponent('intro-trigger', {
         false
       );
 
-      const sound =
+      const sound=
         room2.components['mammoth-sound'];
 
       sound.startLoop();
 
-      const startX =
+      const startX=
         player.object3D.position.x;
 
-      const startY =
+      const startY=
         player.object3D.position.y;
-
 
       sound.thump();
 
-      player.object3D.position.x =
-        startX + 0.12;
+      player.object3D.position.x=
+        startX+.12;
 
       ambient.setAttribute(
         'light',
         'intensity',
-        0.1
+        .1
       );
 
       directional.setAttribute(
         'light',
         'intensity',
-        0.05
+        .05
       );
 
-
-      setTimeout(() => {
-
+      setTimeout(()=>{
         sound.thump();
 
-        player.object3D.position.x =
+        player.object3D.position.x=
           startX;
 
-        player.object3D.position.y =
-          startY + 0.10;
+        player.object3D.position.y=
+          startY+.10;
 
         ambient.setAttribute(
           'light',
@@ -723,43 +768,39 @@ AFRAME.registerComponent('intro-trigger', {
           1
         );
 
-      }, 180);
+      },180);
 
-
-      setTimeout(() => {
-
+      setTimeout(()=>{
         sound.thump();
 
-        player.object3D.position.y =
+        player.object3D.position.y=
           startY;
 
-        player.object3D.position.x =
-          startX - 0.15;
+        player.object3D.position.x=
+          startX-.15;
 
         ambient.setAttribute(
           'light',
           'intensity',
-          0.1
+          .1
         );
 
         directional.setAttribute(
           'light',
           'intensity',
-          0.05
+          .05
         );
 
-      }, 360);
+      },360);
 
-
-      setTimeout(() => {
-
+      setTimeout(()=>{
         sound.thump();
 
-        player.object3D.position.x =
+        player.object3D.position.x=
           startX;
 
-        player.object3D.position.y =
-          startY - 0.10;
+        player.object3D.position.y=
+          startY-.10;
 
         ambient.setAttribute(
           'light',
@@ -773,15 +814,13 @@ AFRAME.registerComponent('intro-trigger', {
           1
         );
 
-      }, 540);
+      },540);
 
-
-      setTimeout(() => {
-
-        player.object3D.position.x =
+      setTimeout(()=>{
+        player.object3D.position.x=
           startX;
 
-        player.object3D.position.y =
+        player.object3D.position.y=
           startY;
 
         ambient.setAttribute(
@@ -795,7 +834,6 @@ AFRAME.registerComponent('intro-trigger', {
           'intensity',
           1
         );
-
 
         line1.setAttribute(
           'visible',
@@ -805,16 +843,14 @@ AFRAME.registerComponent('intro-trigger', {
         line1.setAttribute(
           'animation__intro1',
           {
-            property: 'text.opacity',
-            from: 0,
-            to: 1,
-            dur: 700
+            property:'text.opacity',
+            from:0,
+            to:1,
+            dur:700
           }
         );
 
-
-        setTimeout(() => {
-
+        setTimeout(()=>{
           line2.setAttribute(
             'visible',
             true
@@ -823,18 +859,15 @@ AFRAME.registerComponent('intro-trigger', {
           line2.setAttribute(
             'animation__intro2',
             {
-              property: 'text.opacity',
-              from: 0,
-              to: 1,
-              dur: 700
+              property:'text.opacity',
+              from:0,
+              to:1,
+              dur:700
             }
           );
+        },1000);
 
-        }, 1000);
-
-
-        setTimeout(() => {
-
+        setTimeout(()=>{
           line3.setAttribute(
             'visible',
             true
@@ -843,18 +876,15 @@ AFRAME.registerComponent('intro-trigger', {
           line3.setAttribute(
             'animation__intro3',
             {
-              property: 'text.opacity',
-              from: 0,
-              to: 1,
-              dur: 700
+              property:'text.opacity',
+              from:0,
+              to:1,
+              dur:700
             }
           );
+        },2000);
 
-        }, 2000);
-
-
-        setTimeout(() => {
-
+        setTimeout(()=>{
           line4.setAttribute(
             'visible',
             true
@@ -863,18 +893,202 @@ AFRAME.registerComponent('intro-trigger', {
           line4.setAttribute(
             'animation__intro4',
             {
-              property: 'text.opacity',
-              from: 0,
-              to: 1,
-              dur: 700
+              property:'text.opacity',
+              from:0,
+              to:1,
+              dur:700
             }
           );
 
-          this.waitingForT = true;
+          this.waitingForT=true;
 
-        }, 3000);
+        },3000);
 
-      }, 900);
+      },900);
+    }
+  }
+});
+</script>
+
+
+<!-- 结尾音乐 -->
+<script>
+function playEndingMusic(){
+
+  const AC=
+    window.AudioContext||
+    window.webkitAudioContext;
+
+  const ctx=new AC();
+  const master=ctx.createGain();
+
+  master.gain.setValueAtTime(
+    0,
+    ctx.currentTime
+  );
+
+  master.gain.linearRampToValueAtTime(
+    .07,
+    ctx.currentTime+3
+  );
+
+  master.connect(ctx.destination);
+
+  [
+    [110,.35],
+    [165,.18],
+    [330,.05]
+  ].forEach(([freq,vol])=>{
+
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+
+    osc.type='sine';
+    osc.frequency.value=freq;
+    gain.gain.value=vol;
+
+    osc.connect(gain);
+    gain.connect(master);
+
+    osc.start();
+  });
+
+  const lfo=ctx.createOscillator();
+  const lfoGain=ctx.createGain();
+
+  lfo.frequency.value=.12;
+  lfoGain.gain.value=.015;
+
+  lfo.connect(lfoGain);
+  lfoGain.connect(master.gain);
+
+  lfo.start();
+}
+</script>
+
+
+<!-- 最终结尾 -->
+<script>
+AFRAME.registerComponent('final-ending-trigger',{
+  init(){
+    this.triggered=false;
+  },
+
+  tick(){
+    if(this.triggered)return;
+
+    const player=
+      document.querySelector('#player');
+
+    const overlay=
+      document.querySelector('#endingOverlay');
+
+    const mammoth=
+      document.querySelector('#mammothSilhouette');
+
+    const human=
+      document.querySelector('#humanSilhouette');
+
+    const text=
+      document.querySelector('#endingText');
+
+    if(
+      !player||
+      !overlay||
+      !mammoth||
+      !human||
+      !text
+    )return;
+
+    const p=new THREE.Vector3();
+
+    player.object3D.getWorldPosition(p);
+
+    const target=
+      new THREE.Vector3(
+        -5.1,
+        -0.3,
+        -6.5
+      );
+
+    if(p.distanceTo(target)<.8){
+
+      this.triggered=true;
+
+      player.setAttribute(
+        'wasd-controls',
+        'enabled',
+        false
+      );
+
+      overlay.classList.add('active');
+
+      const sleep=ms=>
+        new Promise(resolve=>
+          setTimeout(resolve,ms)
+        );
+
+      const showMammoth=async ms=>{
+        mammoth.style.opacity=1;
+        human.style.opacity=0;
+        await sleep(ms);
+      };
+
+      const showHuman=async ms=>{
+        mammoth.style.opacity=0;
+        human.style.opacity=1;
+        await sleep(ms);
+      };
+
+      const run=async()=>{
+
+        await showMammoth(1000);
+        await showHuman(1000);
+
+        await showMammoth(500);
+        await showHuman(500);
+
+        await showMammoth(350);
+        await showHuman(350);
+
+        await showMammoth(220);
+        await showHuman(220);
+
+        await showMammoth(110);
+        await showHuman(110);
+
+        await showMammoth(80);
+        await showHuman(80);
+
+        mammoth.style.opacity=0;
+        human.style.opacity=0;
+
+        overlay.classList.add(
+          'fullBlack'
+        );
+
+        await sleep(1800);
+
+        const room2=
+          document.querySelector('#room2');
+
+        if(
+          room2&&
+          room2.components['mammoth-sound']
+        ){
+          room2.components[
+            'mammoth-sound'
+          ].stopLoop();
+        }
+
+        text.classList.add('show');
+
+        setTimeout(()=>{
+          playEndingMusic();
+        },500);
+      };
+
+      run();
     }
   }
 });
@@ -912,128 +1126,123 @@ AFRAME.registerComponent('intro-trigger', {
 </a-assets>
 
 
-<!-- Room1 -->
 <a-entity
   gltf-model="#room1"
   position="4 0 10">
 </a-entity>
 
 
-<!-- White dots -->
-<a-sphere position="8.4 -1.2 10" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="8.4 -1.2 10" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
 <a-entity intro-trigger></a-entity>
 
-<a-sphere position="8.4 -1.2 9" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="8.4 -1.2 9" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="8.4 -1.2 8" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="8.4 -1.2 8" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="8.4 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="8.4 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="7.4 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="7.4 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="6.4 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="6.4 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="5.4 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="5.4 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="4.4 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="4.4 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="3.4 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="3.4 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="2.6 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="2.6 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="1.7 -1.2 7" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="1.7 -1.2 7" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="1.7 -1.2 8" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="1.7 -1.2 8" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="1.7 -1.2 9" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="1.7 -1.2 9" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="1.7 -1.2 10" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="1.7 -1.2 10" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="1.7 -1.2 10.8" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="1.7 -1.2 10.8" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="1 -1.2 10.8" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="1 -1.2 10.8" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
-<a-sphere position="0 -1.2 10.8" radius="0.04"
-material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
+<a-sphere position="0 -1.2 10.8" radius=".04"
+material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
 
 <a-entity end-trigger></a-entity>
 
 
-<!-- Door wall -->
 <a-box
   position="-1.0 0 10.1"
-  width="0.4"
+  width=".4"
   height="2.6"
-  depth="0.08"
+  depth=".08"
   color="#1f1f1f">
 </a-box>
 
 <a-box
-  position="0.2 0 10.1"
-  width="0.4"
+  position=".2 0 10.1"
+  width=".4"
   height="2.6"
-  depth="0.08"
+  depth=".08"
   color="#1f1f1f">
 </a-box>
 
 <a-box
-  position="-0.4 1.05 10.1"
-  width="0.8"
-  height="0.5"
-  depth="0.08"
+  position="-.4 1.05 10.1"
+  width=".8"
+  height=".5"
+  depth=".08"
   color="#1f1f1f">
 </a-box>
 
 
-<!-- Door -->
 <a-entity
   id="doorPivot"
-  position="-0.8 -0.2 10.16"
-  door-open="enabled: false">
+  position="-.8 -.2 10.16"
+  door-open="enabled:false">
 
   <a-box
-    position="0.4 0 0"
-    width="0.8"
+    position=".4 0 0"
+    width=".8"
     height="2"
-    depth="0.08"
+    depth=".08"
     color="#3b2b25">
   </a-box>
 
   <a-sphere
-    position="0.7 0 0.07"
-    radius="0.04"
+    position=".7 0 .07"
+    radius=".04"
     color="#cccccc">
   </a-sphere>
 
 </a-entity>
 
 
-<!-- Hallway -->
 <a-entity
   gltf-model="#hallway"
-  position="0.9 0 -0.5">
+  position=".9 0 -.5">
 </a-entity>
 
 <a-box
   position="-1.9 0 5"
-  width="0.08"
+  width=".08"
   height="2.8"
   depth="14"
   color="#101010">
@@ -1041,14 +1250,13 @@ material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
 
 <a-box
   position="-1.9 0 -9"
-  width="0.08"
+  width=".08"
   height="2.8"
   depth="5"
   color="#101010">
 </a-box>
 
 
-<!-- Room2 -->
 <a-entity
   id="room2"
   gltf-model="#room2Model"
@@ -1058,11 +1266,23 @@ material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
 </a-entity>
 
 
-<!-- Player -->
+<!-- 最终白点 -->
+<a-sphere
+  position="-5.1 -1.2 -6.5"
+  radius=".05"
+  material="
+    color:#fff;
+    emissive:#fff;
+    emissiveIntensity:4">
+</a-sphere>
+
+<a-entity final-ending-trigger></a-entity>
+
+
 <a-camera
   id="player"
-  position="8.4 -0.3 11.5"
-  wasd-controls="acceleration: 9"
+  position="8.4 -.3 11.5"
+  wasd-controls="acceleration:9"
   look-controls
   player-run>
 
@@ -1072,75 +1292,227 @@ material="color:#fff; emissive:#fff; emissiveIntensity:4"></a-sphere>
   position="0 0 -1"
   visible="false"
   text="
-    value: ENTER THE DOOR;
-    align: center;
-    color: #ffffff;
-    width: 1;
-    opacity: 0"
+    value:ENTER THE DOOR;
+    align:center;
+    color:#ffffff;
+    width:1;
+    opacity:0"
   material="
-    shader: flat;
-    depthTest: false;
-    depthWrite: false;
-    transparent: true">
+    shader:flat;
+    depthTest:false;
+    depthWrite:false;
+    transparent:true">
 </a-entity>
 
 
 <a-entity
   id="introLine1"
-  position="0 0.26 -1"
+  position="0 .26 -1"
   visible="false"
   text="
-    value: WHAT WAS THAT?;
-    align: center;
-    color: #ffffff;
-    width: 1.15;
-    opacity: 0">
+    value:WHAT WAS THAT?;
+    align:center;
+    color:#ffffff;
+    width:1.15;
+    opacity:0">
 </a-entity>
-
 
 <a-entity
   id="introLine2"
-  position="0 0.06 -1"
+  position="0 .06 -1"
   visible="false"
   text="
-    value: IS THERE A MAMMOTH LIVING IN MY APARTMENT?;
-    align: center;
-    color: #ff3333;
-    width: 1.55;
-    opacity: 0">
+    value:IS THERE A MAMMOTH LIVING IN MY APARTMENT?;
+    align:center;
+    color:#ff3333;
+    width:1.55;
+    opacity:0">
 </a-entity>
-
 
 <a-entity
   id="introLine3"
-  position="0 -0.16 -1"
+  position="0 -.16 -1"
   visible="false"
   text="
-    value: FOLLOW THE WHITE DOTS AND LET'S FIND OUT.;
-    align: center;
-    color: #ffffff;
-    width: 1.25;
-    opacity: 0">
+    value:FOLLOW THE WHITE DOTS AND LET'S FIND OUT.;
+    align:center;
+    color:#ffffff;
+    width:1.25;
+    opacity:0">
 </a-entity>
-
 
 <a-entity
   id="introLine4"
-  position="0 -0.34 -1"
+  position="0 -.34 -1"
   visible="false"
   text="
-    value: PRESS T TO CONTINUE;
-    align: center;
-    color: #bbbbbb;
-    width: 0.75;
-    opacity: 0">
+    value:PRESS T TO CONTINUE;
+    align:center;
+    color:#bbbbbb;
+    width:.75;
+    opacity:0">
 </a-entity>
-
 
 </a-camera>
 
 </a-scene>
 
-</body>
 
+<div id="endingOverlay">
+
+  <div
+    id="mammothSilhouette"
+    class="endingSilhouette">
+
+    <svg viewBox="0 0 600 430">
+  <g fill="#000">
+
+    <!-- 更写实的猛犸主体 -->
+    <path d="
+      M115 190
+      C135 125 205 92 300 95
+      C390 98 458 128 480 185
+      C500 238 485 285 450 305
+      L435 390
+      L392 390
+      L385 298
+      C352 310 315 315 280 310
+      L270 390
+      L225 390
+      L220 300
+      C185 288 158 265 145 238
+      C130 220 120 205 115 190
+      Z"/>
+
+    <!-- 头 -->
+    <path d="
+      M145 165
+      C105 160 70 180 58 215
+      C48 248 65 280 100 290
+      C125 298 155 285 170 258
+      C185 230 180 190 145 165
+      Z"/>
+
+    <!-- 象鼻 -->
+    <path d="
+      M78 240
+      C55 265 52 305 65 340
+      C73 362 91 370 102 352
+      C111 337 96 325 93 305
+      C89 282 98 260 118 245
+      Z"/>
+
+    <!-- 长獠牙 -->
+    <path d="
+      M100 250
+      C48 258 25 300 38 345
+      C45 320 66 292 120 278
+      Z"/>
+
+    <path d="
+      M122 258
+      C82 275 68 308 78 340
+      C88 315 105 295 140 282
+      Z"/>
+
+    <!-- 耳朵 -->
+    <path d="
+      M145 182
+      C185 170 198 205 182 238
+      C170 262 145 270 128 250
+      C112 230 115 195 145 182
+      Z"/>
+
+    <!-- 背部长毛轮廓 -->
+    <path d="
+      M140 175
+      C165 110 220 75 300 78
+      C370 80 430 105 468 160
+      C420 138 360 128 298 130
+      C230 130 180 145 140 175
+      Z"/>
+
+    <!-- 尾巴 -->
+    <path d="
+      M468 190
+      C515 198 525 228 510 250
+      C501 263 490 258 494 245
+      C500 225 485 214 463 212
+      Z"/>
+
+  </g>
+</svg>
+
+  </div>
+
+
+  <div
+    id="humanSilhouette"
+    class="endingSilhouette">
+
+    <svg viewBox="0 0 400 520">
+  <g fill="#000">
+
+    <!-- 头 -->
+    <path d="
+      M175 55
+      C190 42 215 44 230 58
+      C247 75 248 102 235 122
+      C225 138 212 145 195 143
+      C175 141 162 128 157 110
+      C151 90 158 70 175 55
+      Z"/>
+
+    <!-- 脖子 + 肩膀 + 身体 -->
+    <path d="
+      M170 130
+      L165 158
+      C125 166 100 190 92 230
+      L75 345
+      C72 365 83 375 96 365
+      L125 255
+      L130 420
+      L165 420
+      L175 285
+      L188 285
+      L198 420
+      L235 420
+      L240 255
+      L270 365
+      C280 378 294 368 290 347
+      L275 228
+      C268 188 243 165 220 157
+      L218 130
+      Z"/>
+
+    <!-- 左腿 -->
+    <path d="
+      M130 410
+      L165 410
+      L160 500
+      L122 500
+      Z"/>
+
+    <!-- 右腿 -->
+    <path d="
+      M198 410
+      L235 410
+      L243 500
+      L204 500
+      Z"/>
+
+  </g>
+</svg>
+
+  </div>
+
+
+  <div id="endingText">
+    PLEASE KEEP THE NOISE DOWN.<br>
+    SOMEONE LIVES HERE.
+  </div>
+
+</div>
+
+</body>
 </html>
