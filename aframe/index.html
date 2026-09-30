@@ -116,6 +116,37 @@
 }
 </style>
 
+<script>
+AFRAME.registerComponent('wall-collision', {
+  init() {
+    this.lastX = this.el.object3D.position.x;
+  },
+
+  tick() {
+    const p = this.el.object3D.position;
+
+    // 两堵墙的 Z 范围
+    const inWall1 = p.z >= -2 && p.z <= 12;
+    const inWall2 = p.z >= -11.5 && p.z <= -6.5;
+
+    // 墙在 x = -1.9
+    if (inWall1 || inWall2) {
+
+      // 从右边穿向左边
+      if (this.lastX > -1.9 && p.x <= -1.9) {
+        p.x = -1.82;
+      }
+
+      // 从左边穿向右边
+      if (this.lastX < -1.9 && p.x >= -1.9) {
+        p.x = -1.98;
+      }
+    }
+
+    this.lastX = p.x;
+  }
+});
+</script>
 
 <script>
 AFRAME.registerComponent('end-trigger',{
@@ -1284,7 +1315,8 @@ material="color:#fff;emissive:#fff;emissiveIntensity:4"></a-sphere>
   position="8.4 -.3 11.5"
   wasd-controls="acceleration:9"
   look-controls
-  player-run>
+  player-run
+  wall-collision>
 
 
 <a-entity
